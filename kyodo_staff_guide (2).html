@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kyodo Spaces — Staff Operations System</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap');
+  :root {
+    --navy: #1B4F72; --blue: #2E86C1; --sky: #D6EAF8; --accent: #E8F4FD;
+    --text: #1a2332; --muted: #5d7a8a; --border: #d0e4f0; --white: #ffffff;
+    --bg: #f5f8fc; --shadow: 0 2px 12px rgba(27,79,114,0.10); --radius: 14px;
+    --green: #1a7a4a; --green-bg: #e6f7ee; --amber: #b45309; --amber-bg: #fef3cd;
+    --purple: #6b21a8; --purple-bg: #f3e8ff; --red: #991b1b; --red-bg: #fee2e2;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+  .topbar { background: var(--navy); color: white; display: flex; align-items: stretch; flex-shrink: 0; box-shadow: 0 2px 16px rgba(27,79,114,0.25); }
+  .topbar-brand { display: flex; align-items: center; gap: 12px; padding: 12px 20px; }
+  .logo-badge { width: 36px; height: 36px; background: rgba(255,255,255,0.18); border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; letter-spacing: -0.5px; }
+  .topbar-brand h1 { font-size: 15px; font-weight: 600; }
+  .topbar-brand p { font-size: 11px; opacity: 0.65; margin-top: 1px; }
+  .topbar-tabs { display: flex; align-items: flex-end; margin-left: auto; padding: 0 8px; }
+  .tab-btn { padding: 10px 20px; background: none; border: none; cursor: pointer; color: rgba(255,255,255,0.6); font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; border-bottom: 3px solid transparent; transition: all 0.2s; display: flex; align-items: center; gap: 7px; }
+  .tab-btn.active { color: white; border-bottom-color: #4adebd; }
+  .tab-btn:hover:not(.active) { color: rgba(255,255,255,0.85); }
+  .sync-indicator { display: flex; align-items: center; gap: 6px; padding: 0 16px; font-size: 11px; color: rgba(255,255,255,0.7); }
+  .sync-dot { width: 7px; height: 7px; border-radius: 50%; background: #4ade80; flex-shrink: 0; }
+  .sync-dot.syncing { background: #fbbf24; animation: pulse 1s infinite; }
+  .sync-dot.error { background: #f87171; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  .page { display: none; flex: 1; overflow: hidden; }
+  .page.active { display: flex; }
+
+  /* ===== CHAT ===== */
+  .chat-page { flex-direction: row; }
+  .sidebar { width: 248px; background: var(--white); border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; overflow-y: auto; }
+  .sidebar-section { padding: 12px 16px 10px; border-bottom: 1px solid var(--border); }
+  .sidebar-section-title { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px; }
+  .manager-hint { background: linear-gradient(135deg, #e8f4fd, #d6eaf8); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; font-size: 12px; color: var(--navy); line-height: 1.5; }
+  .manager-hint strong { font-weight: 700; display: block; margin-bottom: 4px; }
+  .example-chips { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+  .ex-chip { background: var(--white); border: 1px solid var(--border); border-radius: 7px; padding: 5px 9px; font-size: 11px; color: var(--blue); cursor: pointer; text-align: left; font-family: 'DM Sans', sans-serif; transition: background 0.15s; line-height: 1.4; }
+  .ex-chip:hover { background: var(--accent); }
+  .sidebar-group { padding: 6px 16px 4px; font-size: 10px; font-weight: 700; color: var(--blue); text-transform: uppercase; letter-spacing: 0.6px; background: var(--accent); border-bottom: 1px solid var(--border); }
+  .topic-btn { display: flex; align-items: center; gap: 9px; padding: 9px 16px; background: none; border: none; width: 100%; text-align: left; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 12.5px; color: var(--text); border-bottom: 1px solid #f0f4f8; transition: background 0.15s; }
+  .topic-btn:hover { background: var(--accent); }
+  .topic-icon { font-size: 14px; width: 18px; text-align: center; }
+
+  .chat-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .messages { flex: 1; overflow-y: auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; scroll-behavior: smooth; }
+  .welcome-card { background: linear-gradient(135deg, var(--navy) 0%, var(--blue) 100%); border-radius: 16px; padding: 24px; color: white; margin-bottom: 4px; }
+  .welcome-card h2 { font-size: 18px; font-weight: 700; margin-bottom: 5px; }
+  .welcome-card p { font-size: 13px; opacity: 0.85; line-height: 1.6; margin-bottom: 14px; }
+  .quick-chips { display: flex; flex-wrap: wrap; gap: 7px; }
+  .chip { background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 6px 13px; border-radius: 20px; font-size: 11.5px; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: background 0.15s; }
+  .chip:hover { background: rgba(255,255,255,0.30); }
+  .task-injected-banner { background: var(--green-bg); border: 1px solid #a7f3d0; border-radius: 10px; padding: 10px 14px; font-size: 13px; color: var(--green); display: flex; align-items: center; gap: 8px; margin-top: 6px; cursor: pointer; }
+  .task-injected-banner:hover { background: #d1fae5; }
+  .msg { display: flex; gap: 9px; max-width: 84%; }
+  .msg.user { align-self: flex-end; flex-direction: row-reverse; }
+  .msg.bot { align-self: flex-start; }
+  .avatar { width: 32px; height: 32px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; margin-top: 2px; }
+  .avatar.bot { background: var(--navy); color: white; }
+  .avatar.user { background: var(--blue); color: white; }
+  .bubble { padding: 11px 14px; border-radius: var(--radius); font-size: 13.5px; line-height: 1.65; max-width: 100%; }
+  .msg.bot .bubble { background: var(--white); color: var(--text); box-shadow: var(--shadow); border: 1px solid var(--border); border-top-left-radius: 4px; }
+  .msg.user .bubble { background: var(--navy); color: white; border-top-right-radius: 4px; }
+  .bubble strong { font-weight: 600; }
+  .bubble ul { margin: 7px 0 7px 16px; }
+  .bubble li { margin-bottom: 4px; }
+  .bubble .step { background: var(--accent); border-left: 3px solid var(--blue); padding: 7px 11px; border-radius: 0 8px 8px 0; margin: 4px 0; font-size: 13px; }
+  .bubble table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin: 7px 0; }
+  .bubble th { background: var(--sky); color: var(--navy); padding: 6px 9px; text-align: left; font-weight: 600; }
+  .bubble td { padding: 5px 9px; border-bottom: 1px solid #eef2f7; vertical-align: top; }
+  .bubble tr:last-child td { border-bottom: none; }
+  .bubble tr:nth-child(even) td { background: #f7fbff; }
+  .typing { display: flex; align-items: center; gap: 5px; padding: 11px 14px; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); animation: bounce 1.2s infinite; }
+  .dot:nth-child(2) { animation-delay: 0.2s; }
+  .dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes bounce { 0%,60%,100%{transform:translateY(0)} 30%{transform:translateY(-6px)} }
+  .input-area { padding: 14px 24px 18px; background: var(--white); border-top: 1px solid var(--border); flex-shrink: 0; }
+  .input-row { display: flex; gap: 9px; align-items: flex-end; background: var(--bg); border: 1.5px solid var(--border); border-radius: 13px; padding: 7px 11px; transition: border-color 0.15s; }
+  .input-row:focus-within { border-color: var(--blue); }
+  textarea { flex: 1; border: none; background: transparent; font-family: 'DM Sans', sans-serif; font-size: 13.5px; color: var(--text); resize: none; outline: none; min-height: 22px; max-height: 90px; line-height: 1.5; }
+  textarea::placeholder { color: #9bb0c0; }
+  .send-btn { width: 34px; height: 34px; border-radius: 9px; background: var(--navy); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background 0.15s, transform 0.1s; }
+  .send-btn:hover { background: var(--blue); transform: scale(1.05); }
+  .send-btn:disabled { background: var(--border); cursor: not-allowed; transform: none; }
+  .input-hint { font-size: 11px; color: var(--muted); margin-top: 6px; text-align: center; }
+
+  /* ===== TASK BOARD ===== */
+  .task-page { flex-direction: column; overflow: hidden; }
+  .task-header { background: var(--white); border-bottom: 1px solid var(--border); padding: 13px 22px; display: flex; align-items: center; gap: 14px; flex-shrink: 0; flex-wrap: wrap; }
+  .task-header h2 { font-size: 15px; font-weight: 700; color: var(--navy); }
+  .date-nav { display: flex; align-items: center; gap: 8px; }
+  .date-nav button { background: var(--accent); border: 1px solid var(--border); border-radius: 8px; width: 28px; height: 28px; cursor: pointer; font-size: 14px; color: var(--navy); display: flex; align-items: center; justify-content: center; transition: background 0.15s; }
+  .date-nav button:hover { background: var(--sky); }
+  .date-display { font-size: 13.5px; font-weight: 600; color: var(--navy); min-width: 210px; text-align: center; }
+  .today-btn { background: var(--navy); color: white; border: none; border-radius: 8px; padding: 5px 14px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: background 0.15s; }
+  .today-btn:hover { background: var(--blue); }
+  .refresh-btn { background: var(--accent); color: var(--navy); border: 1px solid var(--border); border-radius: 8px; padding: 5px 12px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: background 0.15s; display: flex; align-items: center; gap: 5px; }
+  .refresh-btn:hover { background: var(--sky); }
+
+  .task-layout { display: flex; flex: 1; overflow: hidden; }
+  .bookings-sidebar { width: 205px; background: var(--white); border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; overflow-y: auto; }
+  .bookings-title { padding: 12px 14px 8px; font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--white); z-index: 1; display: flex; justify-content: space-between; align-items: center; }
+  .add-booking-btn { background: var(--navy); color: white; border: none; border-radius: 6px; padding: 3px 8px; font-size: 11px; font-weight: 600; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+  .add-booking-btn:hover { background: var(--blue); }
+  .booking-card { margin: 8px 10px; border-radius: 10px; padding: 10px 12px; border: 1px solid; }
+  .booking-card.meeting { background: #fffbeb; border-color: #fde68a; }
+  .booking-card.event { background: #eff6ff; border-color: #bfdbfe; }
+  .booking-card.tentative { background: #f5f3ff; border-color: #ddd6fe; }
+  .booking-client { font-size: 12px; font-weight: 700; color: var(--text); }
+  .booking-type { font-size: 10.5px; color: var(--muted); margin: 1px 0; }
+  .booking-time { font-size: 11px; font-weight: 600; color: var(--navy); margin-top: 3px; }
+  .no-bookings { padding: 16px; text-align: center; font-size: 12px; color: var(--muted); font-style: italic; }
+  .booking-del { float: right; background: none; border: none; cursor: pointer; color: var(--muted); font-size: 12px; padding: 0; opacity: 0.5; }
+  .booking-del:hover { opacity: 1; color: var(--red); }
+  .booking-form { padding: 8px 10px 12px; border-top: 1px solid var(--border); }
+  .booking-form input, .booking-form select { width: 100%; border: 1px solid var(--border); border-radius: 7px; padding: 5px 8px; font-size: 12px; font-family: 'DM Sans', sans-serif; color: var(--text); background: var(--bg); outline: none; margin-bottom: 5px; }
+  .booking-form-btn { width: 100%; background: var(--navy); color: white; border: none; border-radius: 7px; padding: 6px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+  .booking-form-btn:hover { background: var(--blue); }
+  .booking-form-title { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 6px; }
+
+  .task-body { flex: 1; overflow-y: auto; padding: 16px 18px; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; align-content: start; }
+
+  .loading-overlay { display: flex; align-items: center; justify-content: center; flex: 1; flex-direction: column; gap: 12px; color: var(--muted); font-size: 14px; }
+  .spinner { width: 32px; height: 32px; border: 3px solid var(--border); border-top-color: var(--blue); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .staff-card { background: var(--white); border: 1px solid var(--border); border-radius: 13px; overflow: hidden; box-shadow: 0 1px 6px rgba(27,79,114,0.06); }
+  .staff-card.day-off-card { opacity: 0.55; }
+  .staff-card-header { padding: 12px 14px 10px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--border); }
+  .staff-avatar { width: 37px; height: 37px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; color: white; }
+  .staff-info { flex: 1; min-width: 0; }
+  .staff-name { font-size: 13px; font-weight: 700; color: var(--text); }
+  .staff-focus { font-size: 10px; color: var(--muted); margin-top: 1px; }
+  .shift-badge { font-size: 10px; color: var(--muted); font-weight: 500; white-space: nowrap; }
+  .day-off-banner-card { padding: 14px; background: #fef2f2; border-left: 3px solid #fca5a5; margin: 8px 12px; border-radius: 8px; font-size: 12px; color: var(--red); font-weight: 500; text-align: center; }
+  .progress-bar-wrap { height: 3px; background: #e8f0f8; margin: 0 14px 6px; border-radius: 10px; overflow: hidden; }
+  .progress-bar-fill { height: 100%; background: var(--green); border-radius: 10px; transition: width 0.3s; }
+  .task-list { padding: 2px 12px 4px; max-height: 240px; overflow-y: auto; }
+  .task-item { display: flex; align-items: flex-start; gap: 7px; padding: 5px 0; border-bottom: 1px solid #f0f6fc; position: relative; }
+  .task-item:last-child { border-bottom: none; }
+  .task-item.growth .task-text::before { content: '↑ '; color: var(--blue); font-size: 10px; font-weight: 700; }
+  .task-item.injected .task-text::before { content: '★ '; color: var(--amber); font-size: 10px; }
+  .task-check { width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid var(--border); background: var(--white); cursor: pointer; flex-shrink: 0; margin-top: 1px; display: flex; align-items: center; justify-content: center; transition: all 0.15s; font-size: 9px; }
+  .task-check.done { background: var(--green); border-color: var(--green); color: white; }
+  .task-text { font-size: 11.5px; color: var(--text); line-height: 1.4; flex: 1; transition: color 0.15s; }
+  .task-text.done { text-decoration: line-through; color: var(--muted); }
+  .task-time { font-size: 10px; color: var(--muted); font-weight: 500; flex-shrink: 0; white-space: nowrap; padding-top: 1px; }
+  .task-del { background: none; border: none; cursor: pointer; color: var(--muted); font-size: 11px; padding: 0 2px; opacity: 0; transition: opacity 0.15s; flex-shrink: 0; }
+  .task-item:hover .task-del { opacity: 1; }
+
+  /* TRACKER */
+  .tracker-section { border-top: 1px solid var(--border); padding: 8px 12px 10px; }
+  .tracker-title { font-size: 10px; font-weight: 700; color: var(--navy); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 7px; }
+  .tracker-summary { display: flex; gap: 8px; margin-bottom: 7px; }
+  .tracker-stat { flex: 1; background: var(--bg); border-radius: 7px; padding: 5px 7px; text-align: center; }
+  .tracker-stat-num { font-size: 16px; font-weight: 700; color: var(--navy); }
+  .tracker-stat-label { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+  .tracker-row { display: flex; gap: 5px; margin-bottom: 5px; align-items: center; }
+  .tracker-input { flex: 1; border: 1px solid var(--border); border-radius: 6px; padding: 4px 7px; font-size: 11px; font-family: 'DM Sans', sans-serif; color: var(--text); background: var(--bg); outline: none; }
+  .tracker-input:focus { border-color: var(--blue); }
+  .tracker-select { border: 1px solid var(--border); border-radius: 6px; padding: 4px 5px; font-size: 11px; font-family: 'DM Sans', sans-serif; color: var(--text); background: var(--bg); outline: none; flex-shrink: 0; }
+  .tracker-add-btn { background: var(--navy); color: white; border: none; border-radius: 6px; padding: 4px 9px; font-size: 11px; font-weight: 600; cursor: pointer; font-family: 'DM Sans', sans-serif; white-space: nowrap; }
+  .tracker-add-btn:hover { background: var(--blue); }
+  .tracker-list { max-height: 130px; overflow-y: auto; }
+  .tracker-item { display: flex; align-items: center; gap: 6px; padding: 4px 0; border-bottom: 1px solid #f0f6fc; font-size: 11px; }
+  .tracker-item:last-child { border-bottom: none; }
+  .tracker-name { flex: 1; font-weight: 500; color: var(--text); }
+  .tracker-visits { color: var(--muted); font-size: 10px; white-space: nowrap; }
+  .tracker-del { background: none; border: none; cursor: pointer; color: var(--muted); font-size: 11px; opacity: 0.5; flex-shrink: 0; }
+  .tracker-del:hover { opacity: 1; color: var(--red); }
+
+  .add-task-row { display: flex; gap: 5px; padding: 5px 12px 10px; }
+  .add-task-input { flex: 1; border: 1px solid var(--border); border-radius: 7px; padding: 5px 8px; font-size: 11.5px; font-family: 'DM Sans', sans-serif; color: var(--text); background: var(--bg); outline: none; }
+  .add-task-input:focus { border-color: var(--blue); }
+  .add-task-btn { background: var(--navy); border: none; border-radius: 7px; color: white; font-size: 15px; width: 27px; height: 27px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.15s; flex-shrink: 0; }
+  .add-task-btn:hover { background: var(--blue); }
+
+  .messages::-webkit-scrollbar, .task-body::-webkit-scrollbar, .sidebar::-webkit-scrollbar,
+  .task-list::-webkit-scrollbar, .bookings-sidebar::-webkit-scrollbar, .tracker-list::-webkit-scrollbar { width: 4px; }
+  .messages::-webkit-scrollbar-track, .task-body::-webkit-scrollbar-track, .sidebar::-webkit-scrollbar-track,
+  .task-list::-webkit-scrollbar-track, .bookings-sidebar::-webkit-scrollbar-track, .tracker-list::-webkit-scrollbar-track { background: transparent; }
+  .messages::-webkit-scrollbar-thumb, .task-body::-webkit-scrollbar-thumb, .sidebar::-webkit-scrollbar-thumb,
+  .task-list::-webkit-scrollbar-thumb, .bookings-sidebar::-webkit-scrollbar-thumb, .tracker-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+
+  @media (max-width: 700px) { .sidebar { display: none; } .bookings-sidebar { display: none; } .task-body { grid-template-columns: 1fr; padding: 12px; } }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-brand">
+    <div class="logo-badge">KS</div>
+    <div><h1>Kyodo. Space + Lounge</h1><p>Staff Operations System</p></div>
+  </div>
+  <div class="topbar-tabs">
+    <button class="tab-btn active" onclick="switchTab('chat')" id="tab-chat">💬 Operations Guide</button>
+    <button class="tab-btn" onclick="switchTab('tasks')" id="tab-tasks">📋 Daily Task Board</button>
+  </div>
+  <div class="sync-indicator">
+    <div class="sync-dot" id="syncDot"></div>
+    <span id="syncLabel">Connected</span>
+  </div>
+</div>
+
+<!-- CHAT PAGE -->
+<div class="page chat-page active" id="page-chat">
+  <div class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">📌 Manager Task Commands</div>
+      <div class="manager-hint"><strong>Just tell me what to assign!</strong>I'll add it straight to the board and sync to Google Sheets.</div>
+      <div class="example-chips">
+        <button class="ex-chip" onclick="askTopic('Add a task for Alyssa today — follow up with all walk-ins who visited 3+ times this month')">+ Alyssa — follow up 3x walk-ins</button>
+        <button class="ex-chip" onclick="askTopic('Add a task for Justine every day this week — post one Reel showing the space')">+ Justine this week — post a Reel</button>
+        <button class="ex-chip" onclick="askTopic('Add a task for Dana today — send 10 cold outreach messages for Virtual Office')">+ Dana — 10 VO cold outreach</button>
+        <button class="ex-chip" onclick="askTopic('Give all staff a task tomorrow — attend 9AM team briefing with owner')">+ All staff — 9AM team briefing</button>
+      </div>
+    </div>
+    <div class="sidebar-group">🏢 Coworking</div>
+    <button class="topic-btn" onclick="askTopic('How do I welcome a walk-in client?')"><span class="topic-icon">🚶</span>Walk-In Procedure</button>
+    <button class="topic-btn" onclick="askTopic('What are all the coworking pass types and rates?')"><span class="topic-icon">💺</span>Pass Types & Rates</button>
+    <button class="topic-btn" onclick="askTopic('How do I register a new coworking member?')"><span class="topic-icon">🏷️</span>Membership Registration</button>
+    <button class="topic-btn" onclick="askTopic('What are the coworking house rules?')"><span class="topic-icon">📋</span>House Rules</button>
+    <button class="topic-btn" onclick="askTopic('What are the daily opening and closing checklists?')"><span class="topic-icon">✅</span>Opening & Closing</button>
+    <div class="sidebar-group">📅 Events & Rooms</div>
+    <button class="topic-btn" onclick="askTopic('How do I handle a meeting room or event booking?')"><span class="topic-icon">📅</span>Booking Procedure</button>
+    <button class="topic-btn" onclick="askTopic('What are all the event space rates?')"><span class="topic-icon">🎉</span>Event Space Rates</button>
+    <button class="topic-btn" onclick="askTopic('What are the meeting room rates?')"><span class="topic-icon">🪑</span>Meeting Room Rates</button>
+    <button class="topic-btn" onclick="askTopic('What are the event add-ons and corkage fees?')"><span class="topic-icon">➕</span>Add-ons & Corkage</button>
+    <button class="topic-btn" onclick="askTopic('What is the cancellation and rescheduling policy?')"><span class="topic-icon">❌</span>Cancellation Policy</button>
+    <button class="topic-btn" onclick="askTopic('How do I set up the room for an event?')"><span class="topic-icon">🔧</span>Room Setup</button>
+    <div class="sidebar-group">🍽️ Food & Catering</div>
+    <button class="topic-btn" onclick="askTopic('What food tray options and prices do we offer?')"><span class="topic-icon">🍱</span>Food Tray Menu</button>
+    <button class="topic-btn" onclick="askTopic('What are our catering packages and rates?')"><span class="topic-icon">🍽️</span>Catering Package</button>
+    <div class="sidebar-group">📬 Virtual Office</div>
+    <button class="topic-btn" onclick="askTopic('What are the virtual office packages and rates?')"><span class="topic-icon">🏠</span>VO Packages & Rates</button>
+    <button class="topic-btn" onclick="askTopic('What is the virtual office mail handling procedure?')"><span class="topic-icon">📬</span>Mail Handling</button>
+    <button class="topic-btn" onclick="askTopic('How do I register a new virtual office client?')"><span class="topic-icon">📝</span>VO Registration</button>
+    <div class="sidebar-group">🏗️ Corporate & Satellite</div>
+    <button class="topic-btn" onclick="askTopic('What are the Corporate Hybrid Plan options and rates?')"><span class="topic-icon">🏢</span>Corporate Hybrid Plans</button>
+    <button class="topic-btn" onclick="askTopic('What are the Satellite Office tiers and rates?')"><span class="topic-icon">📡</span>Satellite Office Tiers</button>
+    <div class="sidebar-group">📊 Business Services</div>
+    <button class="topic-btn" onclick="askTopic('What business registration services do we offer?')"><span class="topic-icon">📄</span>Business Registration</button>
+    <button class="topic-btn" onclick="askTopic('What bookkeeping and accounting services do we offer?')"><span class="topic-icon">📒</span>Bookkeeping Services</button>
+    <button class="topic-btn" onclick="askTopic('What are our payroll and tax compliance services?')"><span class="topic-icon">💼</span>Payroll & Compliance</button>
+    <div class="sidebar-group">💰 Admin & Finance</div>
+    <button class="topic-btn" onclick="askTopic('How do I process a payment and issue a receipt?')"><span class="topic-icon">💰</span>Payments & Receipts</button>
+    <button class="topic-btn" onclick="askTopic('What payment methods do we accept?')"><span class="topic-icon">💳</span>Payment Methods</button>
+    <button class="topic-btn" onclick="askTopic('What is the collection escalation procedure?')"><span class="topic-icon">📊</span>Collections</button>
+    <button class="topic-btn" onclick="askTopic('Give me message templates for client communication.')"><span class="topic-icon">✉️</span>Message Templates</button>
+    <div class="sidebar-group">🚨 Operations</div>
+    <button class="topic-btn" onclick="askTopic('How do I handle a client complaint?')"><span class="topic-icon">💬</span>Handling Complaints</button>
+    <button class="topic-btn" onclick="askTopic('What do I do in a fire or emergency?')"><span class="topic-icon">🚨</span>Emergency Procedures</button>
+  </div>
+  <div class="chat-area">
+    <div class="messages" id="messages">
+      <div class="welcome-card">
+        <h2>👋 Hi! I'm your Kyodo Operations Assistant</h2>
+        <p>Ask me anything about running Kyodo — rates, procedures, food, bookings, and more. You can also <strong>assign tasks to your staff</strong> by just telling me — they'll sync live to Google Sheets so you can monitor from anywhere!</p>
+        <div class="quick-chips">
+          <button class="chip" onclick="askTopic('What are all our coworking pass rates?')">Coworking rates</button>
+          <button class="chip" onclick="askTopic('What are the event space rates?')">Event rates</button>
+          <button class="chip" onclick="askTopic('What food trays do we offer?')">Food & Catering</button>
+          <button class="chip" onclick="askTopic('What are the virtual office packages?')">Virtual Office</button>
+          <button class="chip" onclick="askTopic('Add a task for Dana today — send 10 cold outreach messages for Virtual Office')">Try: assign a task →</button>
+        </div>
+      </div>
+    </div>
+    <div class="input-area">
+      <div class="input-row">
+        <textarea id="userInput" placeholder="Ask about rates/procedures — or say 'Add a task for [name] on [day]…'" rows="1" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+        <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+        </button>
+      </div>
+      <div class="input-hint">Syncs live to Google Sheets · Assign tasks: "Add a task for [name] on [day] — [task]"</div>
+    </div>
+  </div>
+</div>
+
+<!-- TASK BOARD PAGE -->
+<div class="page task-page" id="page-tasks">
+  <div class="task-header">
+    <h2>📋 Daily Task Board</h2>
+    <div class="date-nav">
+      <button onclick="changeDay(-1)">&#8249;</button>
+      <div class="date-display" id="dateDisplay"></div>
+      <button onclick="changeDay(1)">&#8250;</button>
+    </div>
+    <button class="today-btn" onclick="goToday()">Today</button>
+    <button class="refresh-btn" onclick="refreshBoard()">↻ Refresh</button>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted);">
+      <span style="color:var(--blue);font-weight:700;">↑</span> Growth &nbsp;
+      <span style="color:var(--amber);font-weight:700;">★</span> Manager assigned
+    </div>
+  </div>
+  <div class="task-layout">
+    <div class="bookings-sidebar">
+      <div class="bookings-title">
+        📅 Bookings
+        <button class="add-booking-btn" onclick="toggleBookingForm()">+ Add</button>
+      </div>
+      <div id="bookingForm" style="display:none;">
+        <div class="booking-form">
+          <div class="booking-form-title">New Booking</div>
+          <input id="bClient" placeholder="Client name">
+          <input id="bType" placeholder="Meeting Room / Event Hall">
+          <input id="bTime" placeholder="Time (e.g. 3PM–5PM)">
+          <select id="bKind"><option value="meeting">Meeting Room</option><option value="event">Event</option><option value="tentative">Tentative</option></select>
+          <button class="booking-form-btn" onclick="addBooking()">Add Booking</button>
+        </div>
+      </div>
+      <div id="bookingsList"></div>
+    </div>
+    <div id="taskBoardWrapper" style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
+      <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+        <span>Loading from Google Sheets…</span>
+      </div>
+      <div class="task-body" id="taskBoard" style="display:none;"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// CONFIG
+// ============================================================
+const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbzug9bGhGu2e-cxt-16vpIMMRdlwaa3ZuJjyAxGSM7efeAxii4w-dyas9rRI8aAn4SP/exec';
+
+// ============================================================
+// SCHEDULE
+// ============================================================
+const SCHEDULE = {
+  'alyssa':   {'2026-03-23':'8:00 AM–5:00 PM','2026-03-24':'8:00 AM–5:00 PM','2026-03-25':'8:00 AM–5:00 PM','2026-03-26':'DAY OFF','2026-03-27':'8:00 AM–5:00 PM','2026-03-28':'10:00 AM–7:00 PM','2026-03-29':'DAY OFF'},
+  'justine':  {'2026-03-23':'8:00 AM–5:00 PM','2026-03-24':'8:00 AM–5:00 PM','2026-03-25':'8:00 AM–5:00 PM','2026-03-26':'8:00 AM–5:00 PM','2026-03-27':'8:00 AM–5:00 PM','2026-03-28':'DAY OFF','2026-03-29':'DAY OFF'},
+  'marianne': {'2026-03-23':'11:00 AM–8:00 PM','2026-03-24':'DAY OFF','2026-03-25':'2:00 PM–11:00 PM','2026-03-26':'2:00 PM–11:00 PM','2026-03-27':'2:00 PM–11:00 PM','2026-03-28':'2:00 PM–11:00 PM','2026-03-29':'DAY OFF'},
+  'joey':     {'2026-03-23':'DAY OFF','2026-03-24':'11:00 AM–8:00 PM','2026-03-25':'2:00 PM–11:00 PM','2026-03-26':'2:00 PM–11:00 PM','2026-03-27':'2:00 PM–11:00 PM','2026-03-28':'2:00 PM–11:00 PM','2026-03-29':'DAY OFF'},
+  'dana':     {'2026-03-23':'11:00 AM–8:00 PM','2026-03-24':'11:00 AM–8:00 PM','2026-03-25':'11:00 AM–8:00 PM','2026-03-26':'11:00 AM–8:00 PM','2026-03-27':'11:00 AM–8:00 PM','2026-03-28':'DAY OFF','2026-03-29':'DAY OFF'},
+};
+
+function getShiftType(s) {
+  if (!s||s==='DAY OFF') return null;
+  if (s.startsWith('8:')) return 'early';
+  if (s.startsWith('10:')) return 'mid10';
+  if (s.startsWith('11:')) return 'mid11';
+  if (s.startsWith('2:')) return 'late';
+  return 'early';
+}
+
+// ============================================================
+// DEFAULT TASKS
+// ============================================================
+const TASKS = {
+  alyssa: {
+    early: [
+      {text:'Open space: unlock, lights, AC, WiFi check',time:'7:50 AM',g:false},
+      {text:'Check WhatsApp/Viber & all social media DMs — respond to all',time:'8:00 AM',g:false},
+      {text:'Review today\'s bookings and confirm room prep',time:'8:15 AM',g:false},
+      {text:'Greet every walk-in — log name, contact, pass type in Guest Log',time:'All day',g:false},
+      {text:'Pitch monthly membership to at least 2 walk-ins: "If you\'re here 3x+ a week, monthly saves you money — plus priority desk, free 1hr meeting room/month, and bring a guest once a month free"',time:'All day',g:true},
+      {text:'Log all walk-ins in the conversion tracker — mark if pitched and their response',time:'All day',g:true},
+      {text:'Follow up with any walk-in who visited 3+ times this month but hasn\'t upgraded',time:'3:00 PM',g:true},
+      {text:'Check on existing members — quick check-in, are they happy, do they need anything',time:'Afternoon',g:true},
+      {text:'One space observation: what did clients ask for, complain about, or seem to want today?',time:'4:00 PM',g:true},
+      {text:'Endorse pending items and payments to next shift',time:'4:45 PM',g:false},
+      {text:'Count cash, reconcile with sales log, submit end-of-day report to manager',time:'4:50 PM',g:false},
+    ],
+    mid10: [
+      {text:'Check WhatsApp/Viber & all social media DMs — respond to all',time:'10:00 AM',g:false},
+      {text:'Review today\'s bookings and confirm room setups',time:'10:10 AM',g:false},
+      {text:'Greet every walk-in — log in Guest Log',time:'All day',g:false},
+      {text:'Pitch monthly membership to at least 2 walk-ins: "Priority desk, free 1hr meeting room/month, bring a guest once a month free"',time:'All day',g:true},
+      {text:'Log all walk-ins in conversion tracker — pitched? response?',time:'All day',g:true},
+      {text:'Follow up with walk-ins who visited 3+ times but haven\'t upgraded',time:'2:00 PM',g:true},
+      {text:'One space observation: what are clients saying or asking for today?',time:'4:00 PM',g:true},
+      {text:'Count cash, reconcile, submit end-of-day report to manager',time:'6:45 PM',g:false},
+    ],
+  },
+  justine: {
+    early: [
+      {text:'Open space alongside Alyssa — restrooms, coffee station, front desk ready',time:'7:50 AM',g:false},
+      {text:'Check all social media DMs and comments — respond or tag for Dana if it\'s a sales lead',time:'8:00 AM',g:false},
+      {text:'Post 2 Stories: one of the space morning vibe, one engaging (poll, question, or tip)',time:'8:30 AM',g:true},
+      {text:'Take at least 3 photos/videos of the space today — build the content bank',time:'Morning',g:true},
+      {text:'Post or schedule 1 feed post on Instagram and Facebook — proper caption and hashtags',time:'10:00 AM',g:true},
+      {text:'Post 1 Reel or TikTok — space tour, event recap, or "did you know" about our services',time:'11:00 AM',g:true},
+      {text:'Engage: like and comment on 10 target accounts (freelancers, startups, SMEs in QC/BGC)',time:'1:00 PM',g:true},
+      {text:'Post 1 story specifically promoting Virtual Office or Corporate Plan — include the price and key benefit',time:'3:00 PM',g:true},
+      {text:'Handle walk-ins and calls during Alyssa\'s break',time:'As needed',g:false},
+      {text:'Log any DM leads (real inquiries) — hand list to Dana before end of shift',time:'4:30 PM',g:true},
+    ],
+  },
+  marianne: {
+    mid11: [
+      {text:'Check and clean all restrooms — restock tissue and soap',time:'11:00 AM',g:false},
+      {text:'Wipe down all desks, chairs, and common areas',time:'11:10 AM',g:false},
+      {text:'Refill water dispenser and prep coffee station',time:'11:20 AM',g:false},
+      {text:'Confirm room setups for all afternoon bookings',time:'11:30 AM',g:false},
+      {text:'Set up booked rooms per client\'s requested layout',time:'1 hr before event',g:false},
+      {text:'Space improvement observation: note one thing that could look better or be fixed',time:'2:00 PM',g:true},
+      {text:'Mid-day restroom check and restock',time:'3:00 PM',g:false},
+      {text:'Clean rooms immediately after each event — reset for next use',time:'After each event',g:false},
+      {text:'Wipe down coffee station and restock supplies',time:'5:00 PM',g:false},
+      {text:'Final sweep and mop of all common areas',time:'7:30 PM',g:false},
+      {text:'Turn off all lights, AC, and non-essential equipment',time:'7:50 PM',g:false},
+    ],
+    late: [
+      {text:'Check and clean all restrooms on arrival — restock supplies',time:'2:00 PM',g:false},
+      {text:'Wipe down common areas, coffee station, and desks',time:'2:10 PM',g:false},
+      {text:'Confirm and set up all evening room bookings',time:'2:30 PM',g:false},
+      {text:'Set up booked rooms per client\'s requested layout',time:'1 hr before event',g:false},
+      {text:'Space improvement observation: note one thing that could look better or be fixed',time:'4:00 PM',g:true},
+      {text:'Evening restroom check and restock',time:'6:00 PM',g:false},
+      {text:'Refill coffee station and clean counters',time:'6:30 PM',g:false},
+      {text:'Clean rooms immediately after each event — reset for next use',time:'After each event',g:false},
+      {text:'Final sweep and mop before closing',time:'10:30 PM',g:false},
+      {text:'Turn off all lights, AC, and non-essential equipment',time:'10:50 PM',g:false},
+      {text:'Arm alarm and lock all doors',time:'11:00 PM',g:false},
+    ],
+  },
+  joey: {
+    mid11: [
+      {text:'Check and clean all restrooms — restock tissue and soap',time:'11:00 AM',g:false},
+      {text:'Wipe down all desks, chairs, and common areas',time:'11:10 AM',g:false},
+      {text:'Check and refill water dispenser and coffee station',time:'11:20 AM',g:false},
+      {text:'Confirm room setups for afternoon bookings',time:'11:30 AM',g:false},
+      {text:'Set up booked rooms per client\'s requested layout',time:'1 hr before event',g:false},
+      {text:'Space improvement observation: note one thing that could look or function better',time:'2:00 PM',g:true},
+      {text:'Mid-afternoon restroom check and restock',time:'3:00 PM',g:false},
+      {text:'Clean rooms immediately after each event — reset for next use',time:'After each event',g:false},
+      {text:'Final sweep of all areas before end of shift',time:'7:30 PM',g:false},
+      {text:'Turn off all non-essential equipment at end of shift',time:'7:50 PM',g:false},
+    ],
+    late: [
+      {text:'Check and clean all restrooms on arrival — restock supplies',time:'2:00 PM',g:false},
+      {text:'Wipe down common areas, coffee station, and desks',time:'2:10 PM',g:false},
+      {text:'Confirm and assist with all evening room setups',time:'2:30 PM',g:false},
+      {text:'Set up booked rooms per client\'s requested layout',time:'1 hr before event',g:false},
+      {text:'Space improvement observation: note one thing that could look or function better',time:'4:00 PM',g:true},
+      {text:'Evening restroom check and restock',time:'6:00 PM',g:false},
+      {text:'Clean rooms immediately after each event — reset for next use',time:'After each event',g:false},
+      {text:'Assist with final sweep and mop before closing',time:'10:30 PM',g:false},
+      {text:'Arm alarm and lock all doors — coordinate with Marianne',time:'11:00 PM',g:false},
+    ],
+  },
+  dana: {
+    mid11: [
+      {text:'Check and respond to all sales inquiries (Facebook, Instagram, WhatsApp, email)',time:'11:00 AM',g:false},
+      {text:'Send 10 cold outreach messages — priority: QC/BGC businesses for Virtual Office (₱3,000/mo or ₱24,000/yr)',time:'11:30 AM',g:true},
+      {text:'Send 5 follow-up messages to existing leads — push them to next stage',time:'12:30 PM',g:true},
+      {text:'Send 2 proposals today — Virtual Office or Corporate Hybrid Plan priority',time:'1:30 PM',g:true},
+      {text:'Reach out to 3 corporate prospects for Hybrid Plan Option 2 (₱15,000/mo — 34 passes + 10% MR discount)',time:'2:30 PM',g:true},
+      {text:'Update leads tracker in Google Sheets — hot, stalled, needs escalation',time:'3:30 PM',g:true},
+      {text:'Coordinate content with Justine — brief her on one piece targeting VO or Corporate clients',time:'4:00 PM',g:true},
+      {text:'Check with front desk: any walk-ins today who showed interest but didn\'t convert? Add to pipeline.',time:'5:00 PM',g:true},
+      {text:'Log all outreach and call activity for the day',time:'7:30 PM',g:true},
+      {text:'Prepare tomorrow\'s target list — 10 new prospects + 5 follow-ups ready to go',time:'7:45 PM',g:true},
+    ],
+  },
+};
+
+function getDefaultTasks(staffId, shiftStr) {
+  const st = getShiftType(shiftStr);
+  if (!st) return [];
+  const map = TASKS[staffId] || {};
+  const list = map[st] || map[Object.keys(map)[0]] || [];
+  return list.map((t,i) => ({id:'default_'+i, text:t.text, time:t.time, done:false, injected:false, growth:!!t.g}));
+}
+
+// ============================================================
+// STATE
+// ============================================================
+const DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const WORK_DAYS=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+const STAFF=[
+  {id:'alyssa',  name:'Alyssa',  focus:'Client Experience & Conversion', color:'#1B4F72',initials:'AL'},
+  {id:'justine', name:'Justine', focus:'Social Media & Brand',           color:'#2E86C1',initials:'JU'},
+  {id:'marianne',name:'Marianne',focus:'Space Quality',                  color:'#1a7a4a',initials:'MA'},
+  {id:'joey',    name:'Joey',    focus:'Space Quality',                  color:'#15a057',initials:'JO'},
+  {id:'dana',    name:'Dana',    focus:'Pipeline & Growth',              color:'#6b21a8',initials:'DA'},
+];
+const STAFF_MAP={};
+STAFF.forEach(s=>{STAFF_MAP[s.id]=s;STAFF_MAP[s.name.toLowerCase()]=s;});
+
+let currentDate=new Date();
+// localTasks: fallback/cache {dk:{staffId:[{id,text,time,done,injected,growth}]}}
+let localTasks={};
+let showBookingForm=false;
+let chatHistory=[];
+let isLoading=false;
+let isSyncing=false;
+
+function dateKey(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+
+// ============================================================
+// SYNC INDICATOR
+// ============================================================
+function setSyncState(state) {
+  const dot=document.getElementById('syncDot');
+  const label=document.getElementById('syncLabel');
+  if(state==='syncing'){dot.className='sync-dot syncing';label.textContent='Syncing…';}
+  else if(state==='ok'){dot.className='sync-dot';label.textContent='Synced';}
+  else{dot.className='sync-dot error';label.textContent='Sync error';}
+}
+
+async function sheetsGet(params) {
+  const url=new URL(SHEETS_URL);
+  Object.entries(params).forEach(([k,v])=>url.searchParams.set(k,v));
+  const res=await fetch(url.toString());
+  return res.json();
+}
+
+async function sheetsPost(params) {
+  const url=new URL(SHEETS_URL);
+  Object.entries(params).forEach(([k,v])=>url.searchParams.set(k,v));
+  const res=await fetch(url.toString(),{method:'POST'});
+  return res.json();
+}
+
+// ============================================================
+// TAB / DATE
+// ============================================================
+function switchTab(tab){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('page-'+tab).classList.add('active');
+  document.getElementById('tab-'+tab).classList.add('active');
+  if(tab==='tasks') renderBoard();
+}
+function changeDay(d){currentDate=new Date(currentDate);currentDate.setDate(currentDate.getDate()+d);renderBoard();}
+function goToday(){currentDate=new Date();renderBoard();}
+function refreshBoard(){renderBoard();}
+
+// ============================================================
+// BOOKINGS (Sheets-backed)
+// ============================================================
+function toggleBookingForm(){showBookingForm=!showBookingForm;document.getElementById('bookingForm').style.display=showBookingForm?'block':'none';}
+
+async function loadBookings(dk){
+  try{
+    const data=await sheetsGet({action:'getBookings',date:dk});
+    renderBookingsList(dk,data.bookings||[]);
+  }catch(e){renderBookingsList(dk,[]);}
+}
+
+function renderBookingsList(dk,bookings){
+  const list=document.getElementById('bookingsList');
+  if(!bookings.length){list.innerHTML='<div class="no-bookings">No bookings today</div>';return;}
+  list.innerHTML='';
+  bookings.forEach(b=>{
+    const c=document.createElement('div');c.className='booking-card '+(b.kind||'meeting');
+    c.innerHTML=`<button class="booking-del" onclick="deleteBooking('${dk}','${b.id}')">✕</button><div class="booking-client">${b.client}</div><div class="booking-type">${b.type}</div><div class="booking-time">${b.time}</div>`;
+    list.appendChild(c);
+  });
+}
+
+async function addBooking(){
+  const client=document.getElementById('bClient').value.trim();
+  const type=document.getElementById('bType').value.trim();
+  const time=document.getElementById('bTime').value.trim();
+  const kind=document.getElementById('bKind').value;
+  if(!client)return;
+  const dk=dateKey(currentDate);
+  setSyncState('syncing');
+  try{
+    await sheetsPost({action:'addBooking',date:dk,client,type:type||'Booking',time,kind});
+    setSyncState('ok');
+    document.getElementById('bClient').value='';document.getElementById('bType').value='';document.getElementById('bTime').value='';
+    loadBookings(dk);
+  }catch(e){setSyncState('error');}
+}
+
+async function deleteBooking(dk,id){
+  setSyncState('syncing');
+  try{await sheetsPost({action:'deleteBooking',date:dk,id});setSyncState('ok');loadBookings(dk);}
+  catch(e){setSyncState('error');}
+}
+
+// ============================================================
+// TASKS (Sheets-backed with local defaults)
+// ============================================================
+function getLocalTasks(staffId, dk){
+  if(!localTasks[dk]) localTasks[dk]={};
+  if(!localTasks[dk][staffId]){
+    const shift=(SCHEDULE[staffId]||{})[dk]||null;
+    localTasks[dk][staffId]=getDefaultTasks(staffId,shift);
+  }
+  return localTasks[dk][staffId];
+}
+
+async function loadAndMergeTasks(staffId, dk){
+  const defaults=getLocalTasks(staffId,dk);
+  try{
+    const data=await sheetsGet({action:'getTasks',date:dk,staffId});
+    const sheetTasks=data.tasks&&data.tasks[staffId]?data.tasks[staffId]:[];
+    // Merge: apply done states and add injected tasks from sheets
+    const merged=defaults.map(t=>{
+      const found=sheetTasks.find(s=>String(s.taskId)===String(t.id));
+      return found?{...t,done:found.done}:t;
+    });
+    // Add injected tasks from sheets not in defaults
+    sheetTasks.forEach(s=>{
+      if(s.injected&&!merged.find(m=>String(m.id)===String(s.taskId))){
+        merged.push({id:s.taskId,text:s.text,time:s.time,done:s.done,injected:true,growth:s.growth});
+      }
+    });
+    localTasks[dk][staffId]=merged;
+  }catch(e){}
+  return localTasks[dk][staffId];
+}
+
+// ============================================================
+// RENDER BOARD
+// ============================================================
+async function renderBoard(){
+  const dk=dateKey(currentDate);
+  const dayName=DAYS[currentDate.getDay()];
+  document.getElementById('dateDisplay').textContent=dayName+', '+MONTHS[currentDate.getMonth()]+' '+currentDate.getDate()+', '+currentDate.getFullYear();
+
+  const overlay=document.getElementById('loadingOverlay');
+  const board=document.getElementById('taskBoard');
+  overlay.style.display='flex';board.style.display='none';
+
+  loadBookings(dk);
+
+  // Build cards with defaults first (instant)
+  board.innerHTML='';
+  STAFF.forEach(staff=>{
+    const shift=(SCHEDULE[staff.id]||{})[dk]||null;
+    const isDayOff=!shift||shift==='DAY OFF';
+    const card=document.createElement('div');
+    card.className='staff-card'+(isDayOff?' day-off-card':'');
+    card.id='card-'+staff.id;
+    const shiftLabel=isDayOff?'🔴 Day Off':'🟢 '+shift;
+    card.innerHTML=`<div class="staff-card-header">
+      <div class="staff-avatar" style="background:${staff.color}">${staff.initials}</div>
+      <div class="staff-info"><div class="staff-name">${staff.name}</div><div class="staff-focus">${staff.focus}</div></div>
+      <div class="shift-badge">${shiftLabel}</div>
+    </div>`;
+    if(isDayOff){
+      card.innerHTML+=`<div class="day-off-banner-card">🌙 Rest Day — No tasks scheduled</div>`;
+    } else {
+      const tasks=getLocalTasks(staff.id,dk);
+      const pct=tasks.length>0?Math.round((tasks.filter(t=>t.done).length/tasks.length)*100):0;
+      card.innerHTML+=`<div class="progress-bar-wrap"><div class="progress-bar-fill" id="prog-${staff.id}" style="width:${pct}%"></div></div>
+        <div class="task-list" id="tasks-${staff.id}"></div>
+        <div class="add-task-row">
+          <input class="add-task-input" id="newtask-${staff.id}" placeholder="Add a task…" onkeydown="if(event.key==='Enter')addTaskManual('${staff.id}','${dk}')">
+          <button class="add-task-btn" onclick="addTaskManual('${staff.id}','${dk}')">+</button>
+        </div>`;
+      if(staff.id==='alyssa'){
+        card.innerHTML+=`<div class="tracker-section">
+          <div class="tracker-title">📊 Walk-in Conversion Tracker</div>
+          <div class="tracker-summary" id="tracker-summary"></div>
+          <div class="tracker-row">
+            <input class="tracker-input" id="tName" placeholder="Client name">
+            <input class="tracker-input" id="tVisits" placeholder="#" style="width:38px;flex:none;">
+            <select class="tracker-select" id="tStatus">
+              <option value="notyet">Not yet</option>
+              <option value="pitched">Pitched</option>
+              <option value="followup">Follow up</option>
+              <option value="converted">Converted!</option>
+            </select>
+            <button class="tracker-add-btn" onclick="addTrackerEntry('${dk}')">+ Log</button>
+          </div>
+          <div class="tracker-list" id="tracker-list"></div>
+        </div>`;
+      }
+    }
+    board.appendChild(card);
+    if(!isDayOff) renderTaskList(staff.id,getLocalTasks(staff.id,dk));
+  });
+
+  overlay.style.display='none';board.style.display='grid';
+
+  // Now load from Sheets and update (async, non-blocking)
+  setSyncState('syncing');
+  try{
+    await Promise.all(STAFF.map(async staff=>{
+      const shift=(SCHEDULE[staff.id]||{})[dk]||null;
+      if(!shift||shift==='DAY OFF') return;
+      const tasks=await loadAndMergeTasks(staff.id,dk);
+      renderTaskList(staff.id,tasks);
+    }));
+    await loadTrackerFromSheets(dk);
+    setSyncState('ok');
+  }catch(e){setSyncState('error');}
+}
+
+function renderTaskList(staffId,tasks){
+  const container=document.getElementById('tasks-'+staffId);if(!container)return;
+  container.innerHTML='';
+  const dk=dateKey(currentDate);
+  tasks.forEach(task=>{
+    const row=document.createElement('div');
+    row.className='task-item'+(task.growth?' growth':'')+(task.injected?' injected':'');
+    row.innerHTML=`<div class="task-check ${task.done?'done':''}" onclick="toggleTask('${staffId}','${dk}','${task.id}',this)">${task.done?'✓':''}</div>
+      <div class="task-text ${task.done?'done':''}">${task.text}</div>
+      <div class="task-time">${task.time||''}</div>
+      <button class="task-del" onclick="removeTask('${staffId}','${dk}','${task.id}')">✕</button>`;
+    container.appendChild(row);
+  });
+  updateProgress(staffId,tasks);
+}
+
+function updateProgress(staffId,tasks){
+  const bar=document.getElementById('prog-'+staffId);if(!bar)return;
+  const pct=tasks.length>0?Math.round((tasks.filter(t=>t.done).length/tasks.length)*100):0;
+  bar.style.width=pct+'%';
+}
+
+async function toggleTask(staffId,dk,taskId,el){
+  const tasks=localTasks[dk]&&localTasks[dk][staffId];if(!tasks)return;
+  const task=tasks.find(t=>String(t.id)===String(taskId));if(!task)return;
+  task.done=!task.done;
+  // Optimistic UI
+  el.className='task-check'+(task.done?' done':'');
+  el.textContent=task.done?'✓':'';
+  const textEl=el.nextElementSibling;
+  if(textEl){textEl.className='task-text'+(task.done?' done':'')+(task.growth?' growth-text':'');}
+  updateProgress(staffId,tasks);
+  // Sync to sheets
+  setSyncState('syncing');
+  try{
+    await sheetsPost({action:'setTask',date:dk,staffId,taskId:String(taskId),done:String(task.done),text:task.text,time:task.time,injected:String(!!task.injected),growth:String(!!task.growth)});
+    setSyncState('ok');
+  }catch(e){setSyncState('error');}
+}
+
+async function removeTask(staffId,dk,taskId){
+  const tasks=localTasks[dk]&&localTasks[dk][staffId];if(!tasks)return;
+  localTasks[dk][staffId]=tasks.filter(t=>String(t.id)!==String(taskId));
+  renderTaskList(staffId,localTasks[dk][staffId]);
+  setSyncState('syncing');
+  try{await sheetsPost({action:'deleteTask',date:dk,staffId,taskId:String(taskId)});setSyncState('ok');}
+  catch(e){setSyncState('error');}
+}
+
+async function addTaskManual(staffId,dk){
+  const input=document.getElementById('newtask-'+staffId);if(!input)return;
+  const text=input.value.trim();if(!text)return;
+  const id='manual_'+Date.now();
+  const task={id,text,time:'Custom',done:false,injected:false,growth:false};
+  if(!localTasks[dk]) localTasks[dk]={};
+  if(!localTasks[dk][staffId]) localTasks[dk][staffId]=[];
+  localTasks[dk][staffId].push(task);
+  input.value='';
+  renderTaskList(staffId,localTasks[dk][staffId]);
+  setSyncState('syncing');
+  try{await sheetsPost({action:'setTask',date:dk,staffId,taskId:id,done:'false',text,time:'Custom',injected:'false',growth:'false'});setSyncState('ok');}
+  catch(e){setSyncState('error');}
+}
+
+// ============================================================
+// TRACKER (Sheets-backed)
+// ============================================================
+async function loadTrackerFromSheets(dk){
+  try{
+    const data=await sheetsGet({action:'getTracker',date:dk});
+    renderTrackerList(dk,data.entries||[]);
+  }catch(e){}
+}
+
+function renderTrackerList(dk,entries){
+  const el=document.getElementById('tracker-list');if(!el)return;
+  const sum=document.getElementById('tracker-summary');
+  const total=entries.length;
+  const converted=entries.filter(e=>e.status==='converted').length;
+  const pitched=entries.filter(e=>e.status==='pitched'||e.status==='converted').length;
+  if(sum) sum.innerHTML=`<div class="tracker-stat"><div class="tracker-stat-num">${total}</div><div class="tracker-stat-label">Walk-ins</div></div><div class="tracker-stat"><div class="tracker-stat-num">${pitched}</div><div class="tracker-stat-label">Pitched</div></div><div class="tracker-stat"><div class="tracker-stat-num" style="color:var(--green)">${converted}</div><div class="tracker-stat-label">Converted</div></div>`;
+  el.innerHTML='';
+  const statusLabels={notyet:'Not yet',pitched:'Pitched',followup:'Follow up',converted:'Converted!'};
+  entries.forEach(e=>{
+    const row=document.createElement('div');row.className='tracker-item';
+    row.innerHTML=`<div class="tracker-name">${e.name}</div><div class="tracker-visits">${e.visits}x</div>
+      <select style="border:1px solid var(--border);border-radius:5px;padding:2px 4px;font-size:10px;font-family:'DM Sans',sans-serif;color:var(--text);background:var(--bg);outline:none;" onchange="updateTrackerStatus('${dk}','${e.id}',this.value)">
+        ${Object.entries(statusLabels).map(([v,l])=>`<option value="${v}"${e.status===v?' selected':''}>${l}</option>`).join('')}
+      </select>
+      <button class="tracker-del" onclick="deleteTrackerEntry('${dk}','${e.id}')">✕</button>`;
+    el.appendChild(row);
+  });
+}
+
+async function addTrackerEntry(dk){
+  const name=document.getElementById('tName').value.trim();
+  const visits=document.getElementById('tVisits').value||'1';
+  const status=document.getElementById('tStatus').value;
+  if(!name)return;
+  setSyncState('syncing');
+  try{
+    await sheetsPost({action:'addTracker',date:dk,name,visits,status});
+    setSyncState('ok');
+    document.getElementById('tName').value='';
+    loadTrackerFromSheets(dk);
+  }catch(e){setSyncState('error');}
+}
+
+async function updateTrackerStatus(dk,id,status){
+  setSyncState('syncing');
+  try{await sheetsPost({action:'updateTracker',date:dk,id,status});setSyncState('ok');loadTrackerFromSheets(dk);}
+  catch(e){setSyncState('error');}
+}
+
+async function deleteTrackerEntry(dk,id){
+  setSyncState('syncing');
+  try{await sheetsPost({action:'deleteTracker',date:dk,id});setSyncState('ok');loadTrackerFromSheets(dk);}
+  catch(e){setSyncState('error');}
+}
+
+// ============================================================
+// INJECT TASKS FROM CHAT
+// ============================================================
+function parseTargetDates(descriptor){
+  const today=new Date(),lower=(descriptor||'').toLowerCase().trim();
+  if(lower==='this week'||lower==='every day this week'||lower==='all week'){
+    const dates=[];
+    for(let i=0;i<7;i++){const d=new Date(today);d.setDate(today.getDate()+i);if(WORK_DAYS.includes(DAYS[d.getDay()]))dates.push(d);}
+    return dates;
+  }
+  if(!lower||lower==='today')return[new Date(today)];
+  if(lower==='tomorrow'){const d=new Date(today);d.setDate(d.getDate()+1);return[d];}
+  const idx=DAYS.findIndex(d=>d.toLowerCase()===lower);
+  if(idx!==-1){const diff=((idx-today.getDay())+7)%7;const d=new Date(today);d.setDate(today.getDate()+diff);return[d];}
+  return[new Date(today)];
+}
+
+async function injectTasksFromChat(assignments){
+  const summary=[];
+  setSyncState('syncing');
+  try{
+    for(const a of assignments){
+      const staffList=a.who==='all'?STAFF.map(s=>s.id):[a.who];
+      const dates=parseTargetDates(a.days||'today');
+      for(const d of dates){
+        const dk=dateKey(d);
+        for(const staffId of staffList){
+          const staff=STAFF_MAP[staffId];if(!staff)continue;
+          const shift=(SCHEDULE[staffId]||{})[dk]||null;
+          if(shift==='DAY OFF')continue;
+          const id='injected_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
+          const task={id,text:a.task,time:a.time||'Manager assigned',done:false,injected:true,growth:false};
+          if(!localTasks[dk])localTasks[dk]={};
+          if(!localTasks[dk][staffId])localTasks[dk][staffId]=getDefaultTasks(staffId,shift);
+          localTasks[dk][staffId].push(task);
+          // Sync to sheets
+          await sheetsPost({action:'setTask',date:dk,staffId,taskId:id,done:'false',text:a.task,time:a.time||'Manager assigned',injected:'true',growth:'false'});
+          summary.push(staff.name+' · '+DAYS[d.getDay()]+' '+d.getDate());
+          // Re-render if visible
+          const dk2=dateKey(currentDate);
+          if(dk===dk2) renderTaskList(staffId,localTasks[dk][staffId]);
+        }
+      }
+    }
+    setSyncState('ok');
+  }catch(e){setSyncState('error');}
+  return summary;
+}
+
+function processTaskInject(rawText){
+  const match=rawText.match(/TASK_INJECT:(\{.*\})/m);
+  if(!match)return null;
+  try{return injectTasksFromChat(JSON.parse(match[1]).assignments||[]);}
+  catch(e){return null;}
+}
+
+// ============================================================
+// CHAT
+// ============================================================
+const SYSTEM_PROMPT=`You are the Kyodo. Space + Lounge Operations Assistant — AI guide for staff AND manager at Kyodo Spaces (Quezon City and BGC). You handle task assignment AND operations/rates questions.
+
+STAFF & SCHEDULES (week Mar 23–29, 2026):
+- Alyssa (Client Experience & Conversion): Mon–Wed 8AM–5PM, Thu OFF, Fri 8AM–5PM, Sat 10AM–7PM, Sun OFF
+- Justine (Social Media & Brand): Mon–Fri 8AM–5PM, Sat–Sun OFF
+- Marianne (Space Quality): Mon 11AM–8PM, Tue OFF, Wed–Sat 2PM–11PM, Sun OFF
+- Joey (Space Quality): Mon OFF, Tue 11AM–8PM, Wed–Sat 2PM–11PM, Sun OFF
+- Dana (Pipeline & Growth): Mon–Fri 11AM–8PM, Sat–Sun OFF
+
+MEMBERSHIP PITCH: Monthly ₱5,500 benefits — priority desk, free 1hr meeting room/month, bring a guest once a month free. Pitch: "If you're here 3x+ a week, monthly saves you money and you get perks the day pass doesn't."
+
+TASK ASSIGNMENT — output at end of response when manager assigns tasks:
+TASK_INJECT:{"assignments":[{"who":"staffid","days":"day","task":"Task text","time":"Time"}]}
+who: alyssa/justine/marianne/joey/dana/all | days: today/tomorrow/monday–saturday/this week
+
+RATES:
+COWORKING: Daily ₱500 | Half Day ₱350 | Hourly ₱200 | Weekly ₱1,500 | Monthly ₱5,500
+Flex 3d/10d ₱1,500 | Flex 5d/20d ₱2,300 | Flex 10d/30d ₱3,800 | Flex 5h/7d ₱650 | Flex 10h/14d ₱1,200 | Flex 20h/30d ₱2,200 | Inclusions: WiFi, coffee/tea/water, locker
+MEETING ROOM: ≤5 pax ₱600/hr | 6–12 pax ₱1,000/hr
+EVENTS MAIN: 5–10 pax ₱5,000 | 15–20 pax ₱7,000 | 25–30 pax ₱9,000 (3hrs) +₱2,000/hr
+EVENTS WHOLE: 35–40 pax ₱12,000 | 45–50 pax ₱15,000 | 55–60+ pax ₱18,000 (3hrs) +₱2,500/hr
+LOUNGE PARTY (8PM–2AM): ≤30 pax ₱8,000 | 31–50 pax ₱10,000 | 51–70+ pax ₱12,000 +₱2,000/hr
+EVENT ADD-ONS: Outside catering ₱2,000 | DJ ₱5,000 | Live acoustic ₱4,000–6,000 | Early setup ₱1,000 | Lechon ₱1,000 | Dessert table ₱1,000 | Coordination ₱3,000 | Reg table ₱500 | Emcee ₱3,000+ | Logo on TV ₱1,000 | Banner ₱1,000 | Social promo ₱2,000
+VIRTUAL OFFICE: QC Annual ₱24,000 | QC Monthly ₱3,000 | BGC Annual ₱28,000
+CORPORATE HYBRID: Option 1 ₱10,000/mo | Option 2 ₱15,000/mo RECOMMENDED | Option 3 ₱30,000/mo
+SATELLITE: Tier 1 ₱3,500/mo | Tier 2 ₱10,000/mo | Tier 3 ₱12,000/mo
+FOOD TRAYS: Starters ₱2,100 | Pasta ₱1,700–₱2,400 | Mains 10pax ₱900–₱2,300 | Mains 20pax ₱1,700–₱4,200 | Burgers ₱250–₱320 | Desserts ₱300–₱2,000
+CATERING: ₱800/pax (min 30) | ₱700/pax (min 50)
+BUSINESS REG: SEC+BP+BIR ₱72,000 | DTI+BP+BIR ₱39,000 | SEC ₱23,000 | DTI ₱7,000 | BIR ~₱11,500–₱21,000 | Permit ~₱21,000–₱28,000
+BOOKKEEPING: from ₱28,000/mo | Tax compliance ₱8,000/mo | AFS/ITR ₱18,000–₱25,000 | Payroll ₱800/employee/cutoff
+
+Quote exact prices. Tables for rates. Numbered steps for procedures. Filipino if staff writes in Filipino. Gov't fee disclaimer for reg/accounting.`;
+
+function autoResize(el){el.style.height='auto';el.style.height=Math.min(el.scrollHeight,90)+'px';}
+function handleKey(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage();}}
+function askTopic(q){switchTab('chat');setTimeout(()=>{document.getElementById('userInput').value=q;sendMessage();},50);}
+
+function appendMessage(role,html,extraEl){
+  const msgs=document.getElementById('messages');
+  const div=document.createElement('div');div.className='msg '+role;
+  const av=document.createElement('div');av.className='avatar '+role;av.textContent=role==='bot'?'KS':'You';
+  const bub=document.createElement('div');bub.className='bubble';bub.innerHTML=html;
+  if(extraEl)bub.appendChild(extraEl);
+  div.appendChild(av);div.appendChild(bub);msgs.appendChild(div);msgs.scrollTop=msgs.scrollHeight;
+}
+function showTyping(){
+  const msgs=document.getElementById('messages');
+  const div=document.createElement('div');div.className='msg bot';div.id='typing-indicator';
+  const av=document.createElement('div');av.className='avatar bot';av.textContent='KS';
+  const bub=document.createElement('div');bub.className='bubble typing';
+  bub.innerHTML='<div class="dot"></div><div class="dot"></div><div class="dot"></div>';
+  div.appendChild(av);div.appendChild(bub);msgs.appendChild(div);msgs.scrollTop=msgs.scrollHeight;
+}
+function removeTyping(){const el=document.getElementById('typing-indicator');if(el)el.remove();}
+
+function formatResponse(text){
+  let h=text.replace(/TASK_INJECT:.*$/m,'').trim()
+    .replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\*(.*?)\*/g,'<em>$1</em>');
+  h=h.replace(/^(\d+)\.\s(.+)$/gm,'<div class="step"><strong>$1.</strong> $2</div>');
+  const lines=h.split('\n');let inList=false,result=[];
+  for(const line of lines){const t=line.trim();
+    if(t.startsWith('- ')||t.startsWith('• ')){if(!inList){result.push('<ul>');inList=true;}result.push('<li>'+t.substring(2)+'</li>');}
+    else{if(inList){result.push('</ul>');inList=false;}if(t)result.push('<p style="margin:5px 0">'+t+'</p>');else if(result.length>0)result.push('<br>');}
+  }
+  if(inList)result.push('</ul>');return result.join('');
+}
+
+async function sendMessage(){
+  if(isLoading)return;
+  const input=document.getElementById('userInput');
+  const text=input.value.trim();if(!text)return;
+  input.value='';input.style.height='auto';
+  isLoading=true;document.getElementById('sendBtn').disabled=true;
+  appendMessage('user',text);chatHistory.push({role:'user',content:text});showTyping();
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':'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','anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,system:SYSTEM_PROMPT,messages:chatHistory})});
+    const data=await res.json();
+    const reply=data.content?.[0]?.text||"Sorry, couldn't get a response.";
+    removeTyping();chatHistory.push({role:'assistant',content:reply});
+    const injectedPromise=processTaskInject(reply);
+    let extraEl=null;
+    if(injectedPromise){
+      const injected=await injectedPromise;
+      if(injected&&injected.length>0){
+        extraEl=document.createElement('div');extraEl.className='task-injected-banner';
+        extraEl.innerHTML='✅ <span><strong>Tasks added & synced to Sheets:</strong> '+injected.join(', ')+' — <u>View Task Board →</u></span>';
+        extraEl.onclick=()=>switchTab('tasks');
+      }
+    }
+    appendMessage('bot',formatResponse(reply),extraEl);
+  }catch(err){removeTyping();appendMessage('bot','<strong>Connection error.</strong> Please check your internet and try again.');}
+  isLoading=false;document.getElementById('sendBtn').disabled=false;input.focus();
+}
+
+// Init
+renderBoard();
+</script>
+</body>
+</html>
